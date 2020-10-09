@@ -23,7 +23,6 @@ const connect = () => {
 };
 
 const createNewPlaylist = async (accessToken, userId) => {
-  console.log(userId, accessToken);
   const playlistId = await axios
     .post(
       "https://api.spotify.com/v1/users/" + userId + "/playlists",
@@ -55,7 +54,11 @@ const getNewAccessToken = async refreshToken => {
     url: "https://accounts.spotify.com/api/token",
     method: "POST",
     headers: {
-      Authorization: "Basic " + Buffer.from(process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET).toString("base64")
+      Authorization:
+        "Basic " +
+        Buffer.from(
+          process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET
+        ).toString("base64")
     },
     data: qs.stringify({
       grant_type: "refresh_token",
@@ -81,7 +84,12 @@ const getUserId = async accessToken => {
   return userId;
 };
 
-const addPlaylistToDb = async (accessToken, refreshToken, userId, playlistId) => {
+const addPlaylistToDb = async (
+  accessToken,
+  refreshToken,
+  userId,
+  playlistId
+) => {
   const collection = client.db("spotify_party_app").collection("playlists");
   const code = Math.floor(Math.random() * 100000);
   const result = await collection
@@ -107,17 +115,46 @@ app.listen(8000, () => {
 
 app.get("/playlist", async (req, res) => {
   const collection = client.db("spotify_party_app").collection("playlists");
-  const document = await collection.findOne({ code: req.query.code }).catch(err => console.log(err));
+  const document = await collection
+    .findOne({ code: req.query.code })
+    .catch(err => console.log(err));
   const tracks = await axios
-    .get("https://api.spotify.com/v1/playlists/" + document.playlistId + "/tracks", {
-      headers: {
-        Authorization: "Bearer " + document.accessToken
+    .get(
+      "https://api.spotify.com/v1/playlists/" + document.playlistId + "/tracks",
+      {
+        headers: {
+          Authorization: "Bearer " + document.accessToken
+        }
       }
-    })
+    )
     .catch(() => {
       console.log("getPlaylist");
     });
   res.json({ tracks: tracks.data.items });
+});
+
+app.get("/addTrack", async (req, res) => {
+  const trackId = req.query.trackId;
+  const collection = client.db("spotify_party_app").collection("playlists");
+  const document = await collection.findOne({ code: req.query.code });
+  axios
+    .post(
+      "https://api.spotify.com/v1/playlists/" +
+        document.playlistId +
+        "/tracks" +
+        "?uris=spotify:track:" +
+        trackId,
+      {},
+      {
+        headers: {
+          Authorization: "Bearer " + document.accessToken,
+          "Content-Type": "application/json"
+        }
+      }
+    )
+    .then(() => {
+      res.end();
+    });
 });
 
 const search = async (searchString, document) => {
@@ -172,7 +209,11 @@ app.get("/callback", (req, res) => {
     url: "https://accounts.spotify.com/api/token",
     method: "POST",
     headers: {
-      Authorization: "Basic " + Buffer.from(process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET).toString("base64")
+      Authorization:
+        "Basic " +
+        Buffer.from(
+          process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET
+        ).toString("base64")
     },
     data: qs.stringify(data)
   };
@@ -186,7 +227,12 @@ app.get("/callback", (req, res) => {
         userId.then(userId => {
           const playlistId = createNewPlaylist(access_token, userId);
           playlistId.then(playlistId => {
-            const code = addPlaylistToDb(access_token, refresh_token, userId, playlistId);
+            const code = addPlaylistToDb(
+              access_token,
+              refresh_token,
+              userId,
+              playlistId
+            );
             code.then(code => {
               res.redirect("http://localhost:8080/#/party/" + code);
             });
@@ -198,7 +244,8 @@ app.get("/callback", (req, res) => {
 });
 
 app.get("/login", (req, res) => {
-  const scope = "playlist-modify-private playlist-modify-public user-read-currently-playing user-read-playback-state";
+  const scope =
+    "playlist-modify-private playlist-modify-public user-read-currently-playing user-read-playback-state";
   res.redirect(
     "https://accounts.spotify.com/authorize?" +
       stringify({

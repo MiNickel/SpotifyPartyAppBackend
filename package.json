@@ -5,8 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "startDev": "nodemon --exec babel-node indexDev.js",
-    "tsc": "tsc"
+    "startDev": "nodemon --exec babel-node indexDev.js"
   },
   "author": "Michael Nickel",
   "license": "ISC",
