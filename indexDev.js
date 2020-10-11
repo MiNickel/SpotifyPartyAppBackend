@@ -1,4 +1,4 @@
-import express from "express";
+import express, { json } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { stringify } from "querystring";
@@ -155,6 +155,13 @@ app.get("/addTrack", async (req, res) => {
     .then(() => {
       res.end();
     });
+});
+
+app.get("/checkCode", async (req, res) => {
+  const collection = client.db("spotify_party_app").collection("playlists");
+  collection.findOne({ code: req.query.code }, (_err, result) => {
+    res.json(result);
+  });
 });
 
 const search = async (searchString, document) => {
