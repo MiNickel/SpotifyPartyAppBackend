@@ -277,7 +277,7 @@ app.get("/callback", (req, res) => {
               playlistId
             );
             code.then(code => {
-              res.redirect("http://localhost:8080/#/party/" + code);
+              res.redirect(`${process.env.CLIENT_URI}/#/party/` + code);
             });
           });
         });
