@@ -8,7 +8,7 @@ import qs from "qs";
 import "dotenv/config";
 import { MongoClient } from "mongodb";
 
-const redirectUri = "http://localhost:8000/callback";
+const redirectUri = "https://spotify-party-app-backend.herokuapp.com/callback";
 const uri = `mongodb+srv://${process.env.USER}:${process.env.MONGODB_PW}@cluster0.iy9j3.mongodb.net/<dbname>?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
@@ -112,6 +112,10 @@ app.use(cors()).use(cookieParser());
 app.listen(8000, () => {
   console.log("Server started!");
   connect();
+});
+
+app.get("/test", async (req, res) => {
+  res.send("Hello World");
 });
 
 app.get("/playlist", async (req, res) => {

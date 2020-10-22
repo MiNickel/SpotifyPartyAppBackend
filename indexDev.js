@@ -165,6 +165,10 @@ app.get("/checkCode", async (req, res) => {
   });
 });
 
+app.get("/test", async (req, res) => {
+  res.send("Hello World");
+});
+
 app.get("/currentlyPlayingTrack", async (req, res) => {
   const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
