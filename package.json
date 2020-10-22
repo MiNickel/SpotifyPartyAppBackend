@@ -1,19 +1,25 @@
 {
   "name": "server",
   "version": "1.0.0",
+  "engines": {
+    "node": "12.13.0"
+  },
   "description": "spotify-party-app-server",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "startDev": "nodemon --exec babel-node indexDev.js",
-    "start": "babel-node index.js"
+    "start": "NODE_ENV=production node ./build/index.js",
+    "build": "babel -d ./build ./server",
+    "prebuild": "rm -rf build/*",
+    "prestart": "npm build"
   },
   "author": "Michael Nickel",
   "license": "ISC",
   "dependencies": {
+    "@babel/cli": "^7.12.1",
     "assert": "^2.0.0",
     "axios": "^0.20.0",
-    "babel-cli": "^6.26.0",
     "cookie-parser": "^1.4.5",
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
