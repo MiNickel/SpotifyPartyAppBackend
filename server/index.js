@@ -7,6 +7,8 @@ import axios from "axios";
 import qs from "qs";
 import "dotenv/config";
 import { MongoClient } from "mongodb";
+// eslint-disable-next-line no-unused-vars
+import regeneratorRuntime from "regenerator-runtime";
 
 const redirectUri = "https://spotify-party-app-backend.herokuapp.com/callback";
 const uri = `mongodb+srv://${process.env.USER}:${process.env.MONGODB_PW}@cluster0.iy9j3.mongodb.net/<dbname>?retryWrites=true&w=majority`;
