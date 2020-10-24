@@ -8,7 +8,10 @@ import qs from "qs";
 import "dotenv/config";
 import { MongoClient } from "mongodb";
 
-const redirectUri = "http://localhost:8000/callback";
+Array.prototype.move = function (from, to) {
+  this.splice(to, 0, this.splice(from, 1)[0]);
+};
+
 const uri = `mongodb+srv://${process.env.USER}:${process.env.MONGODB_PW}@cluster0.iy9j3.mongodb.net/<dbname>?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
@@ -99,7 +102,8 @@ const addPlaylistToDb = async (
       refreshToken,
       playlistId,
       userId,
-      code: code.toString()
+      code: code.toString(),
+      tracks: []
     })
     .catch(() => console.log("addPlaylistToDb"));
   return result.ops[0].code;
@@ -154,8 +158,66 @@ app.get("/addTrack", async (req, res) => {
       }
     )
     .then(() => {
+      const newTrack = { trackId, likes: 1 };
+      collection.updateOne(
+        { code: req.query.code },
+        { $push: { tracks: newTrack } }
+      );
       res.end();
     });
+});
+
+app.get("/likeTrack", async (req, res) => {
+  const trackId = req.query.trackId;
+  const code = req.query.code;
+  const collection = client.db("spotify_party_app").collection("playlists");
+  const document = await collection.findOne({ code });
+  const documentTracks = document.tracks;
+
+  const response = await getCurrentlyPlayingTrack(document);
+  const currentlyPlayingTrackId = response.data.item.id;
+  const currentlyPlayingTrackIndex = documentTracks.findIndex(
+    item => item.trackId === currentlyPlayingTrackId
+  );
+
+  const rangeStart = documentTracks.findIndex(item => item.trackId === trackId);
+  documentTracks[rangeStart].likes += 1;
+
+  const sortedTrackList = documentTracks.sort((a, b) => {
+    return b.likes - a.likes;
+  });
+  const trackIndexAfter = sortedTrackList.findIndex(
+    item => item.trackId === trackId
+  );
+
+  let insertBefore;
+  if (trackIndexAfter <= currentlyPlayingTrackIndex) {
+    insertBefore = currentlyPlayingTrackIndex + 1;
+    documentTracks.move(trackIndexAfter, insertBefore);
+  } else {
+    insertBefore = trackIndexAfter;
+  }
+
+  axios
+    .put(
+      "https://api.spotify.com/v1/playlists/" + document.playlistId + "/tracks",
+      {
+        range_start: rangeStart,
+        insert_before: insertBefore
+      },
+      {
+        headers: {
+          Authorization: "Bearer " + document.accessToken,
+          "Content-Type": "application/json"
+        }
+      }
+    )
+    .catch(error => console.log(error));
+  collection.updateOne(
+    { code: req.query.code },
+    { $set: { tracks: documentTracks } }
+  );
+  res.end();
 });
 
 app.get("/checkCode", async (req, res) => {
@@ -165,14 +227,8 @@ app.get("/checkCode", async (req, res) => {
   });
 });
 
-app.get("/test", async (req, res) => {
-  res.send("Hello World");
-});
-
-app.get("/currentlyPlayingTrack", async (req, res) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
-  const document = await collection.findOne({ code: req.query.code });
-  const response = await axios
+const getCurrentlyPlayingTrack = async document => {
+  return axios
     .get("https://api.spotify.com/v1/me/player/currently-playing", {
       headers: {
         Authorization: "Bearer " + document.accessToken,
@@ -182,6 +238,12 @@ app.get("/currentlyPlayingTrack", async (req, res) => {
     .catch(error => {
       console.log(error);
     });
+};
+
+app.get("/currentlyPlayingTrack", async (req, res) => {
+  const collection = client.db("spotify_party_app").collection("playlists");
+  const document = await collection.findOne({ code: req.query.code });
+  const response = await getCurrentlyPlayingTrack(document);
   if (response.status === 200) {
     res.json(response.data.item.id);
   } else {
@@ -216,12 +278,12 @@ app.get("/search", async (req, res) => {
       res.json({ tracks: response.data.tracks.items });
     })
     .catch(() => {
-      const newResponse = getNewAccessToken(document.refreshToken);
-      newResponse.then(access_token => {
+      const newAccessToken = getNewAccessToken(document.refreshToken);
+      newAccessToken.then(access_token => {
         document.accessToken = access_token;
         collection.updateOne({ code: req.query.code }, { $set: document });
-        const test = search(req.query.search, document);
-        test.then(response => {
+        const newResponse = search(req.query.search, document);
+        newResponse.then(response => {
           res.json({ tracks: response.data.tracks.items });
         });
       });
@@ -233,7 +295,7 @@ app.get("/callback", (req, res) => {
 
   const data = {
     code: code,
-    redirect_uri: redirectUri,
+    redirect_uri: process.env.REDIRECT_URI,
     grant_type: "authorization_code"
   };
 
@@ -284,7 +346,7 @@ app.get("/login", (req, res) => {
         response_type: "code",
         client_id: process.env.CLIENT_ID,
         scope: scope,
-        redirect_uri: redirectUri
+        redirect_uri: process.env.REDIRECT_URI
       })
   );
 });

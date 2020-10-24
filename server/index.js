@@ -1,117 +1,45 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { stringify } from "querystring";
-import { strictEqual } from "assert";
-import axios from "axios";
-import qs from "qs";
 import "dotenv/config";
+import axios from "axios";
 import { MongoClient } from "mongodb";
+import { stringify } from "querystring";
+import {
+  getCurrentlyPlayingTrack,
+  search,
+  createNewPlaylist,
+  getNewAccessToken,
+  getUserId,
+  addPlaylistToDb,
+  addTrack,
+  likeTrack,
+  getPlaylist
+} from "./functions";
+
+import qs from "qs";
 // eslint-disable-next-line no-unused-vars
 import regeneratorRuntime from "regenerator-runtime";
+import { strictEqual } from "assert";
+import winston from "winston";
 
-const ignoreFavicon = (req, res, next) => {
-  if (req.originalUrl.includes("favicon.ico")) {
-    res.status(204).end();
-  }
-  next();
-};
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.simple(),
+  transports: [new winston.transports.Console()]
+});
 
-const redirectUri = "https://spotify-party-app-backend.herokuapp.com/callback";
 const uri = `mongodb+srv://${process.env.USER}:${process.env.MONGODB_PW}@cluster0.iy9j3.mongodb.net/<dbname>?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
 
-const connect = () => {
-  client.connect(err => {
-    strictEqual(null, err);
-    console.log("Connected to MongoDB");
-    // client.close();
-  });
-};
-
-const createNewPlaylist = async (accessToken, userId) => {
-  const playlistId = await axios
-    .post(
-      "https://api.spotify.com/v1/users/" + userId + "/playlists",
-      {
-        name: "NewPlaylist1",
-        public: "false",
-        collaborative: "true"
-      },
-      {
-        headers: {
-          Authorization: "Bearer " + accessToken,
-          "Content-Type": "application/json"
-        }
-      }
-    )
-    .then(response => {
-      return response.data.id;
-    })
-    .catch(() => {
-      console.log("createNewPlaylist");
-    });
-
-  return playlistId;
-};
-
-const getNewAccessToken = async refreshToken => {
-  // requesting access token from refresh token
-  const authOptions = {
-    url: "https://accounts.spotify.com/api/token",
-    method: "POST",
-    headers: {
-      Authorization:
-        "Basic " +
-        Buffer.from(
-          process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET
-        ).toString("base64")
-    },
-    data: qs.stringify({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken
-    })
-  };
-
-  const response = await axios(authOptions);
-  return response.data.access_token;
-};
-
-const getUserId = async accessToken => {
-  const userId = await axios
-    .get("https://api.spotify.com/v1/me", {
-      headers: {
-        Authorization: "Bearer " + accessToken
-      }
-    })
-    .then(response => {
-      return response.data.id;
-    })
-    .catch(() => console.log("getUserId"));
-  return userId;
-};
-
-const addPlaylistToDb = async (
-  accessToken,
-  refreshToken,
-  userId,
-  playlistId
-) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
-  const code = Math.floor(Math.random() * 100000);
-  const result = await collection
-    .insertOne({
-      accessToken,
-      refreshToken,
-      playlistId,
-      userId,
-      code: code.toString()
-    })
-    .catch(() => console.log("addPlaylistToDb"));
-  return result.ops[0].code;
+const ignoreFavicon = (req, res, next) => {
+  if (req.originalUrl.includes("favicon.ico")) {
+    res.status(204).end();
+  }
+  next();
 };
 
 const app = express();
@@ -121,56 +49,64 @@ app.use(ignoreFavicon);
 app.use(cors()).use(cookieParser());
 
 app.listen(process.env.PORT || 8000, () => {
-  console.log("Server started!");
-  connect();
-});
-
-app.get("/test", async (req, res) => {
-  res.send("Hello World");
+  logger.info("Server started!");
+  client.connect(err => {
+    strictEqual(null, err);
+    logger.info("Connected to MongoDB.");
+  });
 });
 
 app.get("/playlist", async (req, res) => {
   const collection = client.db("spotify_party_app").collection("playlists");
-  const document = await collection
-    .findOne({ code: req.query.code })
-    .catch(err => console.log(err));
-  const tracks = await axios
-    .get(
-      "https://api.spotify.com/v1/playlists/" + document.playlistId + "/tracks",
-      {
-        headers: {
-          Authorization: "Bearer " + document.accessToken
-        }
-      }
-    )
-    .catch(() => {
-      console.log("getPlaylist");
-    });
-  res.json({ tracks: tracks.data.items });
+  const document = await collection.findOne({ code: req.query.code });
+  try {
+    const tracks = await getPlaylist(document);
+    res.json({ tracks: tracks.data.items });
+  } catch (error) {
+    const access_token = await getNewAccessToken(document.refreshToken);
+    document.accessToken = access_token;
+    collection.updateOne({ code: req.query.code }, { $set: document });
+    const tracks = await getPlaylist(document);
+    res.json({ tracks: tracks.data.items });
+  }
 });
 
 app.get("/addTrack", async (req, res) => {
   const trackId = req.query.trackId;
+  const code = req.query.code;
   const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
-  axios
-    .post(
-      "https://api.spotify.com/v1/playlists/" +
-        document.playlistId +
-        "/tracks" +
-        "?uris=spotify:track:" +
-        trackId,
-      {},
-      {
-        headers: {
-          Authorization: "Bearer " + document.accessToken,
-          "Content-Type": "application/json"
-        }
-      }
-    )
-    .then(() => {
-      res.end();
-    });
+  try {
+    await addTrack(trackId, document, collection, code);
+    res.end();
+  } catch (error) {
+    const access_token = await getNewAccessToken(document.refreshToken);
+    document.accessToken = access_token;
+    collection.updateOne({ code: req.query.code }, { $set: document });
+    await addTrack(trackId, document, collection, code);
+    res.end();
+  }
+});
+
+Array.prototype.move = function (from, to) {
+  this.splice(to, 0, this.splice(from, 1)[0]);
+};
+
+app.get("/likeTrack", async (req, res) => {
+  const trackId = req.query.trackId;
+  const code = req.query.code;
+  const collection = client.db("spotify_party_app").collection("playlists");
+  const document = await collection.findOne({ code });
+  try {
+    await likeTrack(trackId, code, document, collection);
+    res.end();
+  } catch (error) {
+    const access_token = await getNewAccessToken(document.refreshToken);
+    document.accessToken = access_token;
+    collection.updateOne({ code: req.query.code }, { $set: document });
+    await likeTrack(trackId, code, document, collection);
+    res.end();
+  }
 });
 
 app.get("/checkCode", async (req, res) => {
@@ -183,60 +119,41 @@ app.get("/checkCode", async (req, res) => {
 app.get("/currentlyPlayingTrack", async (req, res) => {
   const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
-  const response = await axios
-    .get("https://api.spotify.com/v1/me/player/currently-playing", {
-      headers: {
-        Authorization: "Bearer " + document.accessToken,
-        "Content-Type": "application/json"
-      }
-    })
-    .catch(error => {
-      console.log(error);
-    });
-  if (response.status === 200) {
-    res.json(response.data.item.id);
-  } else {
-    res.status(204).end();
+  try {
+    const response = await getCurrentlyPlayingTrack(document);
+    if (response.status === 200) {
+      res.json(response.data.item.id);
+    } else {
+      res.status(204).end();
+    }
+  } catch (error) {
+    const access_token = await getNewAccessToken(document.refreshToken);
+    document.accessToken = access_token;
+    collection.updateOne({ code: req.query.code }, { $set: document });
+    const response = await getCurrentlyPlayingTrack(document);
+    if (response.status === 200) {
+      res.json(response.data.item.id);
+    } else {
+      res.status(204).end();
+    }
   }
 });
-
-const search = async (searchString, document) => {
-  const tracks = await axios
-    .get("https://api.spotify.com/v1/search", {
-      params: {
-        q: searchString,
-        type: "track"
-      },
-      headers: {
-        Authorization: "Bearer " + document.accessToken,
-        "Content-Type": "application/json"
-      }
-    })
-    .catch(() => {
-      console.log("error");
-    });
-  return tracks;
-};
 
 app.get("/search", async (req, res) => {
   const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
-  const response = search(req.query.search, document);
-  response
-    .then(response => {
+  try {
+    const response = await search(req.query.search, document);
+    res.json({ tracks: response.data.tracks.items });
+  } catch (error) {
+    const access_token = await getNewAccessToken(document.refreshToken);
+    document.accessToken = access_token;
+    collection.updateOne({ code: req.query.code }, { $set: document });
+    const test = search(req.query.search, document);
+    test.then(response => {
       res.json({ tracks: response.data.tracks.items });
-    })
-    .catch(() => {
-      const newResponse = getNewAccessToken(document.refreshToken);
-      newResponse.then(access_token => {
-        document.accessToken = access_token;
-        collection.updateOne({ code: req.query.code }, { $set: document });
-        const test = search(req.query.search, document);
-        test.then(response => {
-          res.json({ tracks: response.data.tracks.items });
-        });
-      });
     });
+  }
 });
 
 app.get("/callback", (req, res) => {
@@ -244,7 +161,7 @@ app.get("/callback", (req, res) => {
 
   const data = {
     code: code,
-    redirect_uri: redirectUri,
+    redirect_uri: process.env.REDIRECT_URI,
     grant_type: "authorization_code"
   };
 
@@ -271,6 +188,7 @@ app.get("/callback", (req, res) => {
           const playlistId = createNewPlaylist(access_token, userId);
           playlistId.then(playlistId => {
             const code = addPlaylistToDb(
+              client,
               access_token,
               refresh_token,
               userId,
@@ -295,7 +213,7 @@ app.get("/login", (req, res) => {
         response_type: "code",
         client_id: process.env.CLIENT_ID,
         scope: scope,
-        redirect_uri: redirectUri
+        redirect_uri: process.env.REDIRECT_URI
       })
   );
 });
