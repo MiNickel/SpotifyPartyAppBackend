@@ -116,6 +116,13 @@ app.get("/checkCode", async (req, res) => {
   });
 });
 
+app.get("/getAllTracks", async (req, res) => {
+  const collection = client.db("spotify_party_app").collection("playlists");
+  const document = await collection.findOne({ code: req.query.code });
+
+  res.json(document.tracks);
+});
+
 app.get("/currentlyPlayingTrack", async (req, res) => {
   const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
@@ -195,13 +202,15 @@ app.get("/callback", (req, res) => {
               playlistId
             );
             code.then(code => {
-              res.redirect(`${process.env.CLIENT_URI}/#/party/` + code);
+              res.redirect(
+                `${process.env.CLIENT_URI}/#/party/` + code + "/new"
+              );
             });
           });
         });
       }
     })
-    .catch(() => console.log("callback"));
+    .catch(error => logger.error("callback: " + JSON.stringify(error)));
 });
 
 app.get("/login", (req, res) => {

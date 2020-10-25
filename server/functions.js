@@ -65,28 +65,36 @@ export const likeTrack = async (trackId, code, document, collection) => {
   const documentTracks = document.tracks;
 
   const response = await getCurrentlyPlayingTrack(document);
-  const currentlyPlayingTrackId = response.data.item.id;
-  const currentlyPlayingTrackIndex = documentTracks.findIndex(
-    item => item.trackId === currentlyPlayingTrackId
-  );
+  let currentlyPlayingTrackIndex = -1;
+  if (response.data !== "") {
+    const currentlyPlayingTrackId = response.data.item.id;
+    currentlyPlayingTrackIndex = documentTracks.findIndex(
+      item => item.trackId === currentlyPlayingTrackId
+    );
+  }
 
   const rangeStart = documentTracks.findIndex(item => item.trackId === trackId);
+
+  if (rangeStart < currentlyPlayingTrackIndex) {
+    return;
+  }
+
   documentTracks[rangeStart].likes += 1;
 
-  const sortedTrackList = documentTracks.sort((a, b) => {
+  const documentTrackToSort = documentTracks.slice(
+    currentlyPlayingTrackIndex + 1
+  );
+
+  const sortedTrackList = documentTrackToSort.sort((a, b) => {
     return b.likes - a.likes;
   });
+
   const trackIndexAfter = sortedTrackList.findIndex(
     item => item.trackId === trackId
   );
 
-  let insertBefore;
-  if (trackIndexAfter <= currentlyPlayingTrackIndex) {
-    insertBefore = currentlyPlayingTrackIndex + 1;
-    documentTracks.move(trackIndexAfter, insertBefore);
-  } else {
-    insertBefore = trackIndexAfter;
-  }
+  let insertBefore = trackIndexAfter + currentlyPlayingTrackIndex + 1;
+  documentTracks.move(rangeStart, insertBefore);
 
   axios
     .put(
@@ -184,9 +192,7 @@ export const getCurrentlyPlayingTrack = async document => {
       }
     })
     .catch(error => {
-      console.log(
-        logger.error("getCurrentlyPlayingTrack: " + JSON.stringify(error))
-      );
+      logger.error("getCurrentlyPlayingTrack: " + JSON.stringify(error));
     });
 };
 
