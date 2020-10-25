@@ -16,7 +16,7 @@ import {
   likeTrack,
   getPlaylist
 } from "./functions";
-
+import { v4 as uuidv4 } from "uuid";
 import qs from "qs";
 // eslint-disable-next-line no-unused-vars
 import regeneratorRuntime from "regenerator-runtime";
@@ -163,54 +163,57 @@ app.get("/search", async (req, res) => {
   }
 });
 
-app.get("/callback", (req, res) => {
-  const code = req.query.code || null;
+app.get("/checkAdminId", async (req, res) => {
+  const collection = client.db("spotify_party_app").collection("playlists");
+  const document = await collection.findOne({ adminId: req.query.adminId });
+  if (document === null) {
+    res.status(404).end();
+  }
+  res.status(200).end();
+});
 
-  const data = {
-    code: code,
-    redirect_uri: process.env.REDIRECT_URI,
-    grant_type: "authorization_code"
-  };
+app.get("/callback", async (req, res) => {
+  try {
+    const code = req.query.code || null;
+    const data = {
+      code: code,
+      redirect_uri: process.env.REDIRECT_URI,
+      grant_type: "authorization_code"
+    };
 
-  const getAccessTokenConfig = {
-    url: "https://accounts.spotify.com/api/token",
-    method: "POST",
-    headers: {
-      Authorization:
-        "Basic " +
-        Buffer.from(
-          process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET
-        ).toString("base64")
-    },
-    data: qs.stringify(data)
-  };
+    const getAccessTokenConfig = {
+      url: "https://accounts.spotify.com/api/token",
+      method: "POST",
+      headers: {
+        Authorization:
+          "Basic " +
+          Buffer.from(
+            process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET
+          ).toString("base64")
+      },
+      data: qs.stringify(data)
+    };
 
-  axios(getAccessTokenConfig)
-    .then(response => {
-      if (response.status === 200) {
-        const access_token = response.data.access_token;
-        const refresh_token = response.data.refresh_token;
-        const userId = getUserId(access_token);
-        userId.then(userId => {
-          const playlistId = createNewPlaylist(access_token, userId);
-          playlistId.then(playlistId => {
-            const code = addPlaylistToDb(
-              client,
-              access_token,
-              refresh_token,
-              userId,
-              playlistId
-            );
-            code.then(code => {
-              res.redirect(
-                `${process.env.CLIENT_URI}/#/party/` + code + "/new"
-              );
-            });
-          });
-        });
-      }
-    })
-    .catch(error => logger.error("callback: " + JSON.stringify(error)));
+    const response = await axios(getAccessTokenConfig);
+    if (response.status === 200) {
+      const access_token = response.data.access_token;
+      const refresh_token = response.data.refresh_token;
+      const userId = await getUserId(access_token);
+      const playlistId = await createNewPlaylist(access_token, userId);
+      const uuid = uuidv4();
+      const code = await addPlaylistToDb(
+        client,
+        access_token,
+        refresh_token,
+        userId,
+        playlistId,
+        uuid
+      );
+      res.redirect(`${process.env.CLIENT_URI}/#/party/` + code + "/" + uuid);
+    }
+  } catch (error) {
+    logger.error("callback: " + JSON.stringify(error));
+  }
 });
 
 app.get("/login", (req, res) => {

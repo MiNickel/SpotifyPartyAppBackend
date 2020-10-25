@@ -166,7 +166,8 @@ export const addPlaylistToDb = async (
   accessToken,
   refreshToken,
   userId,
-  playlistId
+  playlistId,
+  uuid
 ) => {
   const collection = client.db("spotify_party_app").collection("playlists");
   const code = Math.floor(Math.random() * 100000);
@@ -177,7 +178,8 @@ export const addPlaylistToDb = async (
       playlistId,
       userId,
       code: code.toString(),
-      tracks: []
+      tracks: [],
+      adminId: uuid
     })
     .catch(error => logger.error("addPlaylistToDb: " + JSON.stringify(error)));
   return result.ops[0].code;
