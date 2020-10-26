@@ -61,6 +61,27 @@ export const addTrack = async (trackId, document, collection, code) => {
     );
 };
 
+export const playTrack = (trackId, document) => {
+  axios
+    .put(
+      "https://api.spotify.com/v1/me/player/play",
+      {
+        context_uri: "spotify:playlist:" + document.playlistId,
+        offset: { uri: "spotify:track:" + trackId },
+        position_ms: 0
+      },
+      {
+        headers: {
+          Authorization: "Bearer " + document.accessToken,
+          "Content-Type": "application/json"
+        }
+      }
+    )
+    .catch(error =>
+      logger.error("playTrack: " + logger.error(JSON.stringify(error)))
+    );
+};
+
 export const likeTrack = async (trackId, code, document, collection) => {
   const documentTracks = document.tracks;
 

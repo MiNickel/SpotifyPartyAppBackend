@@ -14,7 +14,8 @@ import {
   addPlaylistToDb,
   addTrack,
   likeTrack,
-  getPlaylist
+  getPlaylist,
+  playTrack
 } from "./functions";
 import { v4 as uuidv4 } from "uuid";
 import qs from "qs";
@@ -107,6 +108,19 @@ app.get("/likeTrack", async (req, res) => {
     await likeTrack(trackId, code, document, collection);
     res.end();
   }
+});
+
+app.get("/playTrack", async (req, res) => {
+  const trackId = req.query.trackId;
+  const code = req.query.code;
+  const adminId = req.query.adminId;
+  const collection = client.db("spotify_party_app").collection("playlists");
+  const document = await collection.findOne({ code });
+  if (document.adminId !== adminId) {
+    res.status(403).end();
+  }
+  playTrack(trackId, document);
+  res.end();
 });
 
 app.get("/checkCode", async (req, res) => {
@@ -218,7 +232,7 @@ app.get("/callback", async (req, res) => {
 
 app.get("/login", (req, res) => {
   const scope =
-    "playlist-modify-private playlist-modify-public user-read-currently-playing user-read-playback-state";
+    "playlist-modify-private playlist-modify-public user-read-currently-playing user-read-playback-state user-modify-playback-state";
   res.redirect(
     "https://accounts.spotify.com/authorize?" +
       stringify({
