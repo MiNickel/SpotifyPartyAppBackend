@@ -61,8 +61,8 @@ export const addTrack = async (trackId, document, collection, code) => {
     );
 };
 
-export const playTrack = (trackId, document) => {
-  axios
+export const playTrack = async (trackId, document) => {
+  const response = await axios
     .put(
       "https://api.spotify.com/v1/me/player/play",
       {
@@ -77,9 +77,10 @@ export const playTrack = (trackId, document) => {
         }
       }
     )
-    .catch(error =>
-      logger.error("playTrack: " + logger.error(JSON.stringify(error)))
-    );
+    .catch(error => {
+      return error;
+    });
+  return response;
 };
 
 export const likeTrack = async (trackId, code, document, collection) => {
@@ -183,14 +184,13 @@ export const getUserId = async accessToken => {
 };
 
 export const addPlaylistToDb = async (
-  client,
+  collection,
   accessToken,
   refreshToken,
   userId,
   playlistId,
   uuid
 ) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
   const code = Math.floor(Math.random() * 100000);
   const result = await collection
     .insertOne({

@@ -35,7 +35,7 @@ const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
-
+let collection;
 const ignoreFavicon = (req, res, next) => {
   if (req.originalUrl.includes("favicon.ico")) {
     res.status(204).end();
@@ -54,11 +54,11 @@ app.listen(process.env.PORT || 8000, () => {
   client.connect(err => {
     strictEqual(null, err);
     logger.info("Connected to MongoDB.");
+    collection = client.db("spotify_party_app").collection("playlists");
   });
 });
 
 app.get("/playlist", async (req, res) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
   try {
     const tracks = await getPlaylist(document);
@@ -75,7 +75,6 @@ app.get("/playlist", async (req, res) => {
 app.get("/addTrack", async (req, res) => {
   const trackId = req.query.trackId;
   const code = req.query.code;
-  const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
   try {
     await addTrack(trackId, document, collection, code);
@@ -96,7 +95,6 @@ Array.prototype.move = function (from, to) {
 app.get("/likeTrack", async (req, res) => {
   const trackId = req.query.trackId;
   const code = req.query.code;
-  const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code });
   try {
     await likeTrack(trackId, code, document, collection);
@@ -114,31 +112,30 @@ app.get("/playTrack", async (req, res) => {
   const trackId = req.query.trackId;
   const code = req.query.code;
   const adminId = req.query.adminId;
-  const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code });
   if (document.adminId !== adminId) {
     res.status(403).end();
   }
-  playTrack(trackId, document);
+  const response = await playTrack(trackId, document);
+  if (response.response && response.response.status === 404) {
+    res.status(404).end();
+  }
   res.end();
 });
 
 app.get("/checkCode", async (req, res) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
   collection.findOne({ code: req.query.code }, (_err, result) => {
     res.json(result);
   });
 });
 
 app.get("/getAllTracks", async (req, res) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
 
   res.json(document.tracks);
 });
 
 app.get("/currentlyPlayingTrack", async (req, res) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
   try {
     const response = await getCurrentlyPlayingTrack(document);
@@ -161,7 +158,6 @@ app.get("/currentlyPlayingTrack", async (req, res) => {
 });
 
 app.get("/search", async (req, res) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ code: req.query.code });
   try {
     const response = await search(req.query.search, document);
@@ -178,7 +174,6 @@ app.get("/search", async (req, res) => {
 });
 
 app.get("/checkAdminId", async (req, res) => {
-  const collection = client.db("spotify_party_app").collection("playlists");
   const document = await collection.findOne({ adminId: req.query.adminId });
   if (document === null) {
     res.status(404).end();
@@ -216,7 +211,7 @@ app.get("/callback", async (req, res) => {
       const playlistId = await createNewPlaylist(access_token, userId);
       const uuid = uuidv4();
       const code = await addPlaylistToDb(
-        client,
+        collection,
         access_token,
         refresh_token,
         userId,
