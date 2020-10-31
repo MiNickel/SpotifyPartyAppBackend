@@ -15,7 +15,7 @@ import {
   addTrack,
   likeTrack,
   getPlaylist,
-  playTrack
+  playTrack,
 } from "./functions";
 import { v4 as uuidv4 } from "uuid";
 import qs from "qs";
@@ -27,15 +27,21 @@ import winston from "winston";
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.simple(),
-  transports: [new winston.transports.Console()]
+  transports: [new winston.transports.Console()],
 });
 
 const uri = `mongodb+srv://${process.env.USER}:${process.env.MONGODB_PW}@cluster0.iy9j3.mongodb.net/<dbname>?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
 });
 let collection;
+
+const corsOptions = {
+  origin: process.env.CLIENT_URI,
+  optionsSuccessStatus: 200,
+};
+
 const ignoreFavicon = (req, res, next) => {
   if (req.originalUrl.includes("favicon.ico")) {
     res.status(204).end();
@@ -47,7 +53,7 @@ const app = express();
 
 app.use(ignoreFavicon);
 
-app.use(cors()).use(cookieParser());
+app.use(cors(corsOptions)).use(cookieParser());
 
 app.listen(process.env.PORT || 8000, () => {
   logger.info("Server started!");
@@ -187,7 +193,7 @@ app.get("/callback", async (req, res) => {
     const data = {
       code: code,
       redirect_uri: process.env.REDIRECT_URI,
-      grant_type: "authorization_code"
+      grant_type: "authorization_code",
     };
 
     const getAccessTokenConfig = {
@@ -198,9 +204,9 @@ app.get("/callback", async (req, res) => {
           "Basic " +
           Buffer.from(
             process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET
-          ).toString("base64")
+          ).toString("base64"),
       },
-      data: qs.stringify(data)
+      data: qs.stringify(data),
     };
 
     const response = await axios(getAccessTokenConfig);
@@ -234,7 +240,7 @@ app.get("/login", (req, res) => {
         response_type: "code",
         client_id: process.env.CLIENT_ID,
         scope: scope,
-        redirect_uri: process.env.REDIRECT_URI
+        redirect_uri: process.env.REDIRECT_URI,
       })
   );
 });
