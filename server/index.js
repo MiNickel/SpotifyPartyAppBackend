@@ -16,6 +16,7 @@ import {
   likeTrack,
   getPlaylist,
   playTrack,
+  splitPlaylist,
 } from "./functions";
 import { v4 as uuidv4 } from "uuid";
 import qs from "qs";
@@ -68,7 +69,20 @@ app.get("/playlist", async (req, res) => {
   const document = await collection.findOne({ code: req.query.code });
   try {
     const tracks = await getPlaylist(document);
-    res.json({ tracks: tracks.data.items });
+    const currentlyPlayingTrack = await getCurrentlyPlayingTrack(
+      document.accessToken
+    );
+    if (currentlyPlayingTrack.data === "") {
+      res.json({ tracks: tracks.data.items });
+    }
+    const newTracks = splitPlaylist(
+      currentlyPlayingTrack.data.item.id,
+      tracks.data.items
+    );
+    res.json({
+      tracks: newTracks,
+      currentlyPlayingTrack: currentlyPlayingTrack.data.item.id,
+    });
   } catch (error) {
     const access_token = await getNewAccessToken(document.refreshToken);
     document.accessToken = access_token;
@@ -135,16 +149,10 @@ app.get("/checkCode", async (req, res) => {
   });
 });
 
-app.get("/getAllTracks", async (req, res) => {
-  const document = await collection.findOne({ code: req.query.code });
-
-  res.json(document.tracks);
-});
-
 app.get("/currentlyPlayingTrack", async (req, res) => {
   const document = await collection.findOne({ code: req.query.code });
   try {
-    const response = await getCurrentlyPlayingTrack(document);
+    const response = await getCurrentlyPlayingTrack(document.accessToken);
     if (response.status === 200) {
       res.json(response.data.item.id);
     } else {

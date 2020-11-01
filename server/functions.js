@@ -7,7 +7,7 @@ import winston from "winston";
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.simple(),
-  transports: [new winston.transports.Console()]
+  transports: [new winston.transports.Console()],
 });
 
 export const createNewPlaylist = async (accessToken, userId) => {
@@ -17,13 +17,13 @@ export const createNewPlaylist = async (accessToken, userId) => {
       {
         name: "NewPlaylist1",
         public: "false",
-        collaborative: "true"
+        collaborative: "true",
       },
       {
         headers: {
           Authorization: "Bearer " + accessToken,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     )
     .then(response => {
@@ -48,8 +48,8 @@ export const addTrack = async (trackId, document, collection, code) => {
       {
         headers: {
           Authorization: "Bearer " + document.accessToken,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     )
     .then(() => {
@@ -68,13 +68,13 @@ export const playTrack = async (trackId, document) => {
       {
         context_uri: "spotify:playlist:" + document.playlistId,
         offset: { uri: "spotify:track:" + trackId },
-        position_ms: 0
+        position_ms: 0,
       },
       {
         headers: {
           Authorization: "Bearer " + document.accessToken,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     )
     .catch(error => {
@@ -123,13 +123,13 @@ export const likeTrack = async (trackId, code, document, collection) => {
       "https://api.spotify.com/v1/playlists/" + document.playlistId + "/tracks",
       {
         range_start: rangeStart,
-        insert_before: insertBefore
+        insert_before: insertBefore,
       },
       {
         headers: {
           Authorization: "Bearer " + document.accessToken,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     )
     .catch(error => logger.error("likeTrack: " + JSON.stringify(error)));
@@ -141,8 +141,8 @@ export const getPlaylist = async document => {
     "https://api.spotify.com/v1/playlists/" + document.playlistId + "/tracks",
     {
       headers: {
-        Authorization: "Bearer " + document.accessToken
-      }
+        Authorization: "Bearer " + document.accessToken,
+      },
     }
   );
 };
@@ -157,12 +157,12 @@ export const getNewAccessToken = async refreshToken => {
         "Basic " +
         Buffer.from(
           process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET
-        ).toString("base64")
+        ).toString("base64"),
     },
     data: qs.stringify({
       grant_type: "refresh_token",
-      refresh_token: refreshToken
-    })
+      refresh_token: refreshToken,
+    }),
   };
 
   const response = await axios(authOptions);
@@ -173,8 +173,8 @@ export const getUserId = async accessToken => {
   const userId = await axios
     .get("https://api.spotify.com/v1/me", {
       headers: {
-        Authorization: "Bearer " + accessToken
-      }
+        Authorization: "Bearer " + accessToken,
+      },
     })
     .then(response => {
       return response.data.id;
@@ -200,23 +200,32 @@ export const addPlaylistToDb = async (
       userId,
       code: code.toString(),
       tracks: [],
-      adminId: uuid
+      adminId: uuid,
     })
     .catch(error => logger.error("addPlaylistToDb: " + JSON.stringify(error)));
   return result.ops[0].code;
 };
 
-export const getCurrentlyPlayingTrack = async document => {
+export const getCurrentlyPlayingTrack = async accessToken => {
   return axios
     .get("https://api.spotify.com/v1/me/player/currently-playing", {
       headers: {
-        Authorization: "Bearer " + document.accessToken,
-        "Content-Type": "application/json"
-      }
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json",
+      },
     })
     .catch(error => {
       logger.error("getCurrentlyPlayingTrack: " + JSON.stringify(error));
     });
+};
+
+export const splitPlaylist = (currentlyPlayingTrackId, tracks) => {
+  const indexToSplitAt = tracks.findIndex(
+    item => item.track.id === currentlyPlayingTrackId
+  );
+  if (indexToSplitAt === -1) return tracks;
+  const newTracks = tracks.slice(indexToSplitAt);
+  return newTracks;
 };
 
 export const search = async (searchString, document) => {
@@ -224,12 +233,12 @@ export const search = async (searchString, document) => {
     .get("https://api.spotify.com/v1/search", {
       params: {
         q: searchString,
-        type: "track"
+        type: "track",
       },
       headers: {
         Authorization: "Bearer " + document.accessToken,
-        "Content-Type": "application/json"
-      }
+        "Content-Type": "application/json",
+      },
     })
     .catch(error => {
       logger.error("search: " + JSON.stringify(error));
