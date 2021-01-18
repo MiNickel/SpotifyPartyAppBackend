@@ -34,7 +34,7 @@
     "winston": "^3.3.3"
   },
   "devDependencies": {
-    "eslint": "^7.12.1",
+    "eslint": "^7.18.0",
     "eslint-config-prettier": "^6.15.0",
     "nodemon": "^2.0.6"
   }
