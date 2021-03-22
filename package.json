@@ -9,7 +9,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "startDev": "nodemon --exec ts-node ./src/index.ts",
-    "start": "ts-node ./dist/index.js",
+    "start": "node ./dist/index.js",
     "build": "tsc -p .",
     "prebuild": "rm -rf dist/*",
     "prestart": "npm run build",
