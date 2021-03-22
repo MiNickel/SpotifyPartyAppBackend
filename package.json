@@ -13,7 +13,6 @@
     "postinstall": "tsc",
     "build": "tsc -p .",
     "prebuild": "rm -rf dist/*",
-    "prestart": "npm run build",
     "format": "prettier --config .prettierrc.json --write **/*.{ts,json}",
     "lint": "prettier --config .prettierrc.json --ignore-path .gitignore --check **/*.{ts,json} && eslint **/*.ts"
   },
