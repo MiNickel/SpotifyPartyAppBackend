@@ -29,16 +29,20 @@ class PlaylistController extends Controller {
     if (!document) {
       res.end();
     } else {
-      const tracks = await this.playlistService.getPlaylist(document);
-      const currentlyPlayingTrack = await this.playerService.getCurrentlyPlayingTrack(document.accessToken);
-      if (currentlyPlayingTrack === '') {
-        res.json({ tracks: tracks.items });
-      } else {
-        const newTracks = this.playlistService.splitPlaylist(currentlyPlayingTrack.item!.id, tracks.items);
-        res.json({
-          tracks: newTracks,
-          currentlyPlayingTrack: currentlyPlayingTrack.item!.id,
-        });
+      try {
+        const tracks = await this.playlistService.getPlaylist(document);
+        const currentlyPlayingTrack = await this.playerService.getCurrentlyPlayingTrack(document.accessToken);
+        if (currentlyPlayingTrack === '') {
+          res.json({ tracks: tracks.items });
+        } else {
+          const newTracks = this.playlistService.splitPlaylist(currentlyPlayingTrack.item!.id, tracks.items);
+          res.json({
+            tracks: newTracks,
+            currentlyPlayingTrack: currentlyPlayingTrack.item!.id,
+          });
+        }
+      } catch (error) {
+        logger.error(`error while getting current playlist: ${error}`);
       }
     }
   }
