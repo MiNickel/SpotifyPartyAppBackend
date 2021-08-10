@@ -2,7 +2,7 @@ import express from 'express';
 import moment from 'moment';
 import { Collection } from 'mongodb';
 import { Playlist } from '../types/playlist';
-import { encrypt } from './crypto';
+import { decrypt, encrypt } from './crypto';
 import { getNewAccessToken } from './refreshToken';
 
 const verifyToken = async (req: express.Request, _res: express.Response, next: express.NextFunction): Promise<void> => {
@@ -14,10 +14,10 @@ const verifyToken = async (req: express.Request, _res: express.Response, next: e
   if (document) {
     const expired = document.expireDate < moment().format();
     if (expired) {
-      const response = await getNewAccessToken(document.refreshToken);
+      const response = await getNewAccessToken(decrypt(document.refreshToken));
       document.accessToken = encrypt(response.accessToken);
       document.expireDate = moment().add(response.expiresIn, 'seconds').format();
-      collection.updateOne({ code: code }, { $set: document });
+      await collection.updateOne({ code: code }, { $set: document });
     }
   }
   next();
