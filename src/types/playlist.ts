@@ -9,6 +9,7 @@ export type Playlist = {
   expireDate: string;
   tracks: Track[];
   adminId: string;
+  users: string[];
 };
 
 export type ApiTokenResponse = {

@@ -45,12 +45,29 @@ export class PlaylistService {
 
   public splitPlaylist = (currentlyPlayingTrackId: string, tracks: SpotifyApi.PlaylistTrackObject[]) => {
     const indexToSplitAt = tracks.findIndex((item) => item.track.id === currentlyPlayingTrackId);
-    if (indexToSplitAt === -1) return tracks;
     const newTracks = tracks.slice(indexToSplitAt);
     return newTracks;
   };
 
-  public addTrack = async (trackId: string, document: Playlist, collection: Collection<Playlist>, code: string) => {
+  public addTrack = async (
+    trackId: string,
+    document: Playlist,
+    collection: Collection<Playlist>,
+    code: string,
+    nickname: string
+  ) => {
+    const trackAlreadyExists = await collection.findOne({ 'tracks.trackId': trackId, code });
+    if (trackAlreadyExists) {
+      const currentlyPlayingTrack = await this.playerService.getCurrentlyPlayingTrack(document.accessToken);
+      if (currentlyPlayingTrack === '') return;
+      const currentlyPlayingTrackIndex = document.tracks.findIndex(
+        (track) => track.trackId === currentlyPlayingTrack.item!.id
+      );
+      const newTrackIndex = document.tracks.findIndex((track) => track.trackId === trackId);
+      if (newTrackIndex >= currentlyPlayingTrackIndex) {
+        return;
+      }
+    }
     await axios.post(
       'https://api.spotify.com/v1/playlists/' + document.playlistId + '/tracks' + '?uris=spotify:track:' + trackId,
       {},
@@ -61,11 +78,17 @@ export class PlaylistService {
         },
       }
     );
-    const newTrack = { trackId, likes: 1 };
+    const newTrack = { trackId, likes: [nickname] };
     collection.updateOne({ code }, { $push: { tracks: newTrack } });
   };
 
-  public likeTrack = async (trackId: string, code: string, document: Playlist, collection: Collection<Playlist>) => {
+  public likeTrack = async (
+    trackId: string,
+    code: string,
+    document: Playlist,
+    collection: Collection<Playlist>,
+    nickname: string
+  ) => {
     const documentTracks = document.tracks;
 
     const currentlyPlayingTrack = await this.playerService.getCurrentlyPlayingTrack(document.accessToken);
@@ -75,18 +98,15 @@ export class PlaylistService {
       currentlyPlayingTrackIndex = documentTracks.findIndex((item) => item.trackId === currentlyPlayingTrackId);
     }
 
-    const rangeStart = documentTracks.findIndex((item) => item.trackId === trackId);
-
-    if (rangeStart < currentlyPlayingTrackIndex) {
-      return;
-    }
-
-    documentTracks[rangeStart].likes += 1;
-
     const documentTrackToSort = documentTracks.slice(currentlyPlayingTrackIndex + 1);
 
+    const rangeStart = documentTrackToSort.findIndex((item) => item.trackId === trackId);
+
+    if (rangeStart === -1) return;
+
+    documentTracks[rangeStart].likes.push(nickname);
     const sortedTrackList = documentTrackToSort.sort((a, b) => {
-      return b.likes - a.likes;
+      return b.likes.length - a.likes.length;
     });
 
     const trackIndexAfter = sortedTrackList.findIndex((item) => item.trackId === trackId);

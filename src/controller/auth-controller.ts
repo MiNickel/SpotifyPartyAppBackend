@@ -1,8 +1,6 @@
-import axios, { AxiosRequestConfig } from 'axios';
 import express from 'express';
 import moment from 'moment';
 import { Collection } from 'mongodb';
-import qs from 'qs';
 import { stringify } from 'querystring';
 import { Playlist } from '../types/playlist';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,7 +20,7 @@ class AuthController extends Controller {
   }
 
   initializeRoutes() {
-    this.router.get('/checkCode', (req, res, next) => this.checkCode(req, res).catch(next));
+    this.router.get('/checkCode', (req, res, next) => this.checkCodeAndNickname(req, res).catch(next));
     this.router.get('/checkAdminId', (req, res, next) => this.checkAdminId(req, res).catch(next));
     this.router.get('/login', (req, res) => this.login(req, res));
     this.router.get('/callback', (req, res, next) => this.callbackAfterLogin(req, res).catch(next));
@@ -46,6 +44,7 @@ class AuthController extends Controller {
       adminId,
       code,
       tracks: [],
+      users: ['admin'],
     };
     const playlistCode = await this.playlistService.addPlaylistToDb(playlist, collection);
     res.redirect(`${process.env.CLIENT_URI}/#/party/` + playlistCode + '/' + adminId);
@@ -65,10 +64,11 @@ class AuthController extends Controller {
     );
   }
 
-  async checkCode(req: express.Request, res: express.Response): Promise<void> {
+  async checkCodeAndNickname(req: express.Request, res: express.Response): Promise<void> {
     const collection: Collection<Playlist> = req.app.locals.collection;
     const code = req.query.code as string;
-    const result = await this.authService.checkCode(code, collection);
+    const nickname = req.query.nickname as string;
+    const result = await this.authService.checkCodeAndNickname(code, collection, nickname);
     res.json(result);
   }
 

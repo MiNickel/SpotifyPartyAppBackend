@@ -2,7 +2,7 @@
   "name": "server",
   "version": "1.0.0",
   "engines": {
-    "node": "12.13.0"
+    "node": "14.17.1"
   },
   "description": "spotify-party-app-server",
   "main": "index.js",

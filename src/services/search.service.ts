@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { Playlist } from '../types/playlist';
 import { decrypt } from '../util/crypto';
 
 export class SearchService {

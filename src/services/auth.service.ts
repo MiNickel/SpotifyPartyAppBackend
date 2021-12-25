@@ -7,6 +7,7 @@ interface IAuthService {
   getAccessToken(authCode: string): Promise<ApiTokenResponse>;
   checkCode(code: string, collection: Collection<Playlist>): Promise<Playlist | null>;
   generateCode(collection: Collection<Playlist>): Promise<string>;
+  checkCodeAndNickname(code: string, collection: Collection<Playlist>, user: string): Promise<string | null>;
 }
 
 export class AuthService implements IAuthService {
@@ -47,6 +48,19 @@ export class AuthService implements IAuthService {
   async checkCode(code: string, collection: Collection<Playlist>): Promise<Playlist | null> {
     const result = await collection.findOne({ code });
     return result;
+  }
+
+  async checkCodeAndNickname(code: string, collection: Collection<Playlist>, user: string): Promise<string | null> {
+    const result = await collection.findOne({ code });
+    if (!result) {
+      return 'Die Party existiert nicht.';
+    }
+    const result2 = await collection.findOne({ code, users: { $nin: [user] } });
+    if (!result2) {
+      return 'Der Nickname ist bereits vergeben.';
+    }
+    await collection.updateOne({ code }, { $push: { users: user } });
+    return null;
   }
 }
 
