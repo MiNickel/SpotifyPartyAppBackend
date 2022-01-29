@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Collection } from 'mongodb';
+import { nanoid } from 'nanoid';
 import { Playlist } from '../types/playlist';
 import { decrypt } from '../util/crypto';
 import { PlayerService } from './player.service';
@@ -17,7 +18,7 @@ export class PlaylistService {
     const response = await axios.post(
       'https://api.spotify.com/v1/users/' + userId + '/playlists',
       {
-        name: 'NewPlaylist1',
+        name: 'Playlist' + nanoid(7),
         public: 'false',
         collaborative: 'true',
       },
