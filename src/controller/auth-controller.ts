@@ -9,6 +9,7 @@ import { PlaylistService } from '../services/playlist.service';
 import Controller from './controller';
 import { encrypt } from '../util/crypto';
 import IAuthService, { AuthService } from '../services/auth.service';
+import logger from '../util/logger';
 
 class AuthController extends Controller {
   private userService = new UserService();
@@ -68,8 +69,12 @@ class AuthController extends Controller {
     const collection: Collection<Playlist> = req.app.locals.collection;
     const code = req.query.code as string;
     const nickname = req.query.nickname as string;
-    const result = await this.authService.checkCodeAndNickname(code, collection, nickname);
-    res.json(result);
+    try {
+      const result = await this.authService.checkCodeAndNickname(code, collection, nickname);
+      res.json(result);
+    } catch (error) {
+      logger.error(error);
+    }
   }
 
   async checkAdminId(req: express.Request, res: express.Response): Promise<void> {
